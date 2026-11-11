@@ -459,6 +459,66 @@ func zerlege(_ antwort: String) -> (anzeige: String, einsetzen: String) {
 
 // MARK: - Blase
 
+// MARK: - Randfarbe
+
+/// Leuchtender Rand der Blase. „Automatisch“ richtet sich nach dem Hintergrund am Mauszeiger.
+enum Randfarbe: String, CaseIterable {
+    case automatisch, neongruen, pink, cyan, orange, lila, weiss
+    var name: String {
+        switch self {
+        case .automatisch: return "Automatisch (nach Hintergrund)"
+        case .neongruen: return "Neon-Grün"
+        case .pink: return "Pink"
+        case .cyan: return "Cyan"
+        case .orange: return "Orange"
+        case .lila: return "Lila"
+        case .weiss: return "Weiß"
+        }
+    }
+    var farbe: Color {
+        switch self {
+        case .automatisch, .neongruen: return Color(red: 0.22, green: 1.0, blue: 0.08)
+        case .pink: return Color(red: 1.0, green: 0.12, blue: 0.62)
+        case .cyan: return Color(red: 0.0, green: 0.9, blue: 1.0)
+        case .orange: return Color(red: 1.0, green: 0.55, blue: 0.0)
+        case .lila: return Color(red: 0.62, green: 0.25, blue: 1.0)
+        case .weiss: return Color.white
+        }
+    }
+    static var gewaehlt: Randfarbe {
+        get { Randfarbe(rawValue: UserDefaults.standard.string(forKey: "randfarbe") ?? "") ?? .automatisch }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "randfarbe") }
+    }
+    /// Farbe für diesen Hintergrund: dunkel → Neon-Grün, hell → kräftiges Pink (Neon geht auf Hell unter).
+    static func fuer(helligkeit: Double?) -> Color {
+        let wahl = gewaehlt
+        guard wahl == .automatisch else { return wahl.farbe }
+        guard let h = helligkeit else { return Randfarbe.neongruen.farbe }
+        return h < 0.55 ? Randfarbe.neongruen.farbe : Color(red: 0.90, green: 0.0, blue: 0.50)
+    }
+}
+
+/// Mittlere Helligkeit (0 bis 1) eines Bildes, z. B. des Bildes um den Mauszeiger.
+func helligkeit(_ pfad: String) -> Double? {
+    guard !pfad.isEmpty, let img = NSImage(contentsOfFile: pfad),
+          let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+    let n = 16
+    var px = [UInt8](repeating: 0, count: n * n * 4)
+    let ok = px.withUnsafeMutableBytes { puffer -> Bool in
+        guard let ctx = CGContext(data: puffer.baseAddress, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+        ctx.interpolationQuality = .medium
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: n, height: n))
+        return true
+    }
+    guard ok else { return nil }
+    var summe = 0.0
+    for i in stride(from: 0, to: px.count, by: 4) {
+        summe += 0.2126 * Double(px[i]) + 0.7152 * Double(px[i + 1]) + 0.0722 * Double(px[i + 2])
+    }
+    return summe / Double(n * n) / 255
+}
+
 final class Blase: ObservableObject {
     struct Zeile: Identifiable {
         let id = UUID()
@@ -478,6 +538,7 @@ final class Blase: ObservableObject {
     @Published var fokus = 0
     @Published var markiertZeichen = 0
     @Published var ausschnittBild: NSImage?
+    @Published var rand: Color = Randfarbe.fuer(helligkeit: nil)
     var ausschnittNeu = ""   // nach der ersten Nachricht aufgezogen, geht mit der nächsten mit
     var kontext = Kontext()
     var vorText = ""
@@ -630,7 +691,14 @@ struct BlasenAnsicht: View {
         }
         .padding(14)
         .background(ZStack { Glas(); Color(red: 0.10, green: 0.10, blue: 0.11).opacity(0.94) }.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
+        .overlay(
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(m.rand.opacity(0.45), lineWidth: 7).blur(radius: 5)
+                RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(m.rand, lineWidth: 1.6)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .allowsHitTesting(false)
+        )
         .environment(\.colorScheme, .dark)
         .onChange(of: m.fokus) { fokus = true }
     }
@@ -754,6 +822,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let dz = DistributedNotificationCenter.default()
         dz.addObserver(forName: .init("\(kennung).oeffnen"), object: nil, queue: .main) { [weak self] _ in self?.kuerzel() }
+        dz.addObserver(forName: .init("\(kennung).still"), object: nil, queue: .main) { [weak self] _ in self?.oeffnen(zuhoeren: false) }
         dz.addObserver(forName: .init("\(kennung).ausschnitt"), object: nil, queue: .main) { [weak self] _ in self?.ausschnitt() }
         dz.addObserver(forName: .init("\(kennung).einsetzen"), object: nil, queue: .main) { [weak self] _ in
             guard let self, let t = self.m.zeilen.last(where: { !$0.vonMir && !$0.fehler && !$0.einsetzen.isEmpty })?.einsetzen else { return }
@@ -788,6 +857,17 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         i.target = self
         if Kuerzel.shared.tap == nil { menu.addItem(withTitle: "Kürzel ^ + 1 wartet auf Bedienungshilfen", action: nil, keyEquivalent: "") }
         menu.addItem(.separator())
+        let farbe = NSMenuItem(title: "Randfarbe", action: nil, keyEquivalent: "")
+        let unter = NSMenu()
+        for f in Randfarbe.allCases {
+            let e = unter.addItem(withTitle: f.name, action: #selector(randfarbeWaehlen(_:)), keyEquivalent: "")
+            e.target = self
+            e.representedObject = f.rawValue
+            e.state = f == Randfarbe.gewaehlt ? .on : .off
+        }
+        farbe.submenu = unter
+        menu.addItem(farbe)
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Autostart ausschalten", action: #selector(autostartAus), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Beenden", action: #selector(beenden), keyEquivalent: "").target = self
     }
@@ -797,6 +877,12 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
     @objc func beenden() { NSApp.terminate(nil) }
+    @objc func randfarbeWaehlen(_ e: NSMenuItem) {
+        guard let roh = e.representedObject as? String, let f = Randfarbe(rawValue: roh) else { return }
+        Randfarbe.gewaehlt = f
+        m.rand = Randfarbe.fuer(helligkeit: helligkeit(m.kontext.bild))
+        log("Randfarbe: \(f.rawValue)")
+    }
     @objc func autostartAus() {
         let plist = home.appendingPathComponent("Library/LaunchAgents/\(kennung).plist")
         let p = Process()
@@ -881,6 +967,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.zuruecksetzen()
         m.kontext = Erfassen.jetzt(punkt: oben)
         m.kontext.bild = Erfassen.bild(punkt: oben)
+        m.rand = Randfarbe.fuer(helligkeit: helligkeit(m.kontext.bild))
         m.kontextKurz = m.kontext.kurz
         m.markiertZeichen = m.kontext.markiert.count
         log("Geöffnet über \(m.kontext.kurz) | Adresse \(m.kontext.adresse.isEmpty ? "-" : String(m.kontext.adresse.prefix(80))) | Text \(m.kontext.umgebung.count) Zeichen, markiert \(m.kontext.markiert.count), Bild \(m.kontext.bild.isEmpty ? "nein" : "ja")")
@@ -1034,6 +1121,10 @@ if argumente.contains("--ausschnitt") {
 }
 if argumente.contains("--einsetzen") {
     DistributedNotificationCenter.default().postNotificationName(.init("\(kennung).einsetzen"), object: nil, userInfo: nil, deliverImmediately: true)
+    exit(0)
+}
+if argumente.contains("--still") {   // Blase öffnen, ohne zuzuhören (zum Tippen)
+    DistributedNotificationCenter.default().postNotificationName(.init("\(kennung).still"), object: nil, userInfo: nil, deliverImmediately: true)
     exit(0)
 }
 if argumente.contains("--oeffnen") {
