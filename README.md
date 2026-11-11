@@ -26,21 +26,49 @@ Beispiele: Auf eine Nachricht zeigen und sagen „Antworte freundlich, dass ich 
 ## Was du brauchst
 
 1. Einen Mac mit macOS 14 (Sonoma) oder neuer.
-2. **Claude Code**, installiert und angemeldet. Im Terminal muss `claude` laufen. Anleitung: https://claude.com/claude-code
-3. Die Entwicklerwerkzeuge von Apple: im Terminal `xcode-select --install` (einmalig, ein paar Minuten).
+2. Ein Claude-Abo (Pro oder höher), Claude Code ist darin enthalten.
+3. Einmalig etwa 15 Minuten. Vorkenntnisse brauchst du nicht.
+
+## Das Terminal, kurz erklärt
+
+Alle Befehle unten tippst du nicht ab, sondern kopierst sie ins Terminal, ein Fenster für Befehle.
+
+- Öffnen: ⌘ und Leertaste drücken, „Terminal“ tippen, Enter.
+- Befehl einfügen: den Befehl hier kopieren (⌘C), ins Terminal klicken, einfügen (⌘V), Enter.
+- Warten, bis das Terminal wieder bereit ist (eine neue Zeile, die mit `%` endet), dann der nächste Befehl.
 
 ## Installieren, Schritt für Schritt
 
-1. Diesen Ordner herunterladen (grüner Knopf „Code“ > „Download ZIP“) und entpacken, oder `git clone`.
-2. Terminal öffnen und in den Ordner wechseln: `cd ~/Downloads/pointy-main` (nach „Download ZIP“ heißt der Ordner `pointy-main`, nach `git clone` nur `pointy`).
-3. Bauen und starten: `./build.sh --start`
-4. Oben in der Menüleiste erscheint ein Mauszeiger-Symbol. Das ist Pointy.
-5. macOS fragt nach Rechten. Alle in **Systemeinstellungen > Datenschutz & Sicherheit**:
+Hast du Claude Code schon (im Terminal läuft `claude`), fang bei Schritt 3 an.
+
+1. Claude Code installieren:
+   ```
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+2. Claude Code einmal starten und anmelden. Den Fragen folgen (Pfeiltasten, Enter), der Browser geht zum Anmelden auf. Danach `/exit` tippen, Enter:
+   ```
+   ~/.local/bin/claude
+   ```
+3. Entwicklerwerkzeuge von Apple installieren. Im Fenster, das aufgeht, „Installieren“ klicken und warten (ein paar Minuten). Steht im Terminal „already installed“, ist alles schon da:
+   ```
+   xcode-select --install
+   ```
+4. Pointy laden, bauen und starten (ein Befehl, dauert etwa eine Minute):
+   ```
+   cd ~/Downloads && curl -fsSL -o pointy.zip https://github.com/muhliskaraca/pointy/archive/refs/heads/main.zip && unzip -oq pointy.zip && cd pointy-main && ./build.sh --start
+   ```
+   Oben in der Menüleiste erscheint ein Mauszeiger-Symbol. Das ist Pointy. (Wer lieber klickt: grüner Knopf „Code“ > „Download ZIP“, dann `cd ~/Downloads/pointy-main` und `./build.sh --start`.)
+5. Rechte geben, alle unter **Apfel-Menü > Systemeinstellungen > Datenschutz & Sicherheit**:
    - **Bedienungshilfen**: Pointy einschalten. Nötig für die Tasten, den Text unter dem Mauszeiger und das Einsetzen.
-   - **Bildschirmaufnahme**: Pointy einschalten. Nötig, damit Claude die Stelle sieht.
+   - **Bildschirmaufnahme** (auf neueren Macs mit „Systemaudio“ im Namen): Pointy einschalten. Nötig, damit Claude die Stelle sieht.
    - **Mikrofon** und **Spracherkennung**: erst beim ersten Sprechen. Wer nur tippt, braucht sie nicht.
-6. Nach dem Erlauben Pointy einmal neu starten: Menüleiste > Beenden, dann `open ~/Applications/Pointy.app`.
+6. Pointy neu starten, damit die Rechte greifen:
+   ```
+   killall Pointy; sleep 1; open ~/Applications/Pointy.app
+   ```
 7. Ausprobieren: auf irgendeinen Text zeigen, ^ halten, 1 tippen, „Was steht hier?“ sagen oder tippen.
+
+Neue Fassung von Pointy holen: Befehl aus Schritt 4 noch einmal.
 
 Pointy startet ab jetzt bei jeder Anmeldung mit. Abschalten: Menüleiste > Autostart ausschalten.
 
@@ -124,21 +152,49 @@ For one session only: `launchctl setenv POINTY_LANG en`.
 ### What you need
 
 1. A Mac with macOS 14 (Sonoma) or newer.
-2. **Claude Code**, installed and signed in. `claude` must run in the Terminal. Guide: https://claude.com/claude-code
-3. Apple's developer tools: in the Terminal, `xcode-select --install` (once, a few minutes).
+2. A Claude subscription (Pro or higher), Claude Code is included.
+3. About 15 minutes, once. No experience needed.
+
+### The Terminal, in short
+
+You don't type the commands below, you copy them into the Terminal, a window for commands.
+
+- Open it: press ⌘ and Space, type "Terminal", Return.
+- Paste a command: copy it here (⌘C), click into the Terminal, paste (⌘V), Return.
+- Wait until the Terminal is ready again (a new line ending in `%`), then the next command.
 
 ### Install, step by step
 
-1. Download this folder (green "Code" button > "Download ZIP") and unzip it, or `git clone`.
-2. Open the Terminal and go into the folder: `cd ~/Downloads/pointy-main` (after "Download ZIP" the folder is called `pointy-main`, after `git clone` just `pointy`).
-3. Build and start: `./build.sh --start`
-4. A mouse pointer icon appears in the menu bar. That's Pointy.
-5. macOS asks for permissions. All of them are in **System Settings > Privacy & Security**:
+Already have Claude Code (`claude` runs in the Terminal)? Start at step 3.
+
+1. Install Claude Code:
+   ```
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+2. Start Claude Code once and sign in. Follow the questions (arrow keys, Return), the browser opens for signing in. Then type `/exit`, Return:
+   ```
+   ~/.local/bin/claude
+   ```
+3. Install Apple's developer tools. In the window that opens, click "Install" and wait (a few minutes). If the Terminal says "already installed", you have them:
+   ```
+   xcode-select --install
+   ```
+4. Download, build and start Pointy (one command, takes about a minute):
+   ```
+   cd ~/Downloads && curl -fsSL -o pointy.zip https://github.com/muhliskaraca/pointy/archive/refs/heads/main.zip && unzip -oq pointy.zip && cd pointy-main && ./build.sh --start
+   ```
+   A mouse pointer icon appears in the menu bar. That's Pointy. (Prefer clicking? Green "Code" button > "Download ZIP", then `cd ~/Downloads/pointy-main` and `./build.sh --start`.)
+5. Give permissions, all under **Apple menu > System Settings > Privacy & Security**:
    - **Accessibility**: switch Pointy on. Needed for the keys, the text under the mouse pointer and inserting.
    - **Screen Recording** (on newer macOS: Screen & System Audio Recording): switch Pointy on. Needed so Claude can see the spot.
    - **Microphone** and **Speech Recognition**: only the first time you talk. If you only type, you don't need them.
-6. After allowing, restart Pointy once: menu bar > Quit, then `open ~/Applications/Pointy.app`.
+6. Restart Pointy so the permissions apply:
+   ```
+   killall Pointy; sleep 1; open ~/Applications/Pointy.app
+   ```
 7. Try it: point at any text, hold the key left of 1, press 1, say or type "What does this say?".
+
+Get a new version of Pointy: run the command from step 4 again.
 
 From now on Pointy starts every time you log in. To stop that: menu bar > Turn off autostart.
 
