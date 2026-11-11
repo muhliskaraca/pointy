@@ -394,7 +394,7 @@ final class Hoeren {
     }
 
     // Apple beginnt nach jeder Sprechpause einen neuen Abschnitt und meldet dann nur diesen.
-    // Darum Abschnitte sammeln, statt den Text zu ersetzen (Muhlis 11.11.: „wenn man Pause macht, geht das davor gesprochen weg“).
+    // Darum Abschnitte sammeln, statt den Text zu ersetzen.
     private var fest = ""          // abgeschlossene Abschnitte
     private var abschnitt = ""     // laufender Abschnitt
     private var zuletztFest = ""   // zuletzt abgeschlossener Abschnitt
