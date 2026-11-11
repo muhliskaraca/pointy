@@ -15,7 +15,29 @@ let cache = home.appendingPathComponent("Library/Caches/\(appName)", isDirectory
 let logDatei = home.appendingPathComponent("Library/Logs/\(appName).log")
 let umgebung = ProcessInfo.processInfo.environment
 /// Claude Code wird über die Login-Shell gesucht (PATH). Anderer Ort: POINTY_CLAUDE=/pfad/zu/claude
-let claudePfad = umgebung["POINTY_CLAUDE"] ?? "claude"
+let claudePfad = umgebung["POINTY_CLAUDE"] ?? findeClaude()
+
+/// Sucht Claude Code an den üblichen Orten, sonst fragt es die interaktive Shell (liest auch ~/.zshrc).
+func findeClaude() -> String {
+    let fm = FileManager.default
+    let orte = [".local/bin/claude", ".claude/local/claude", ".npm-global/bin/claude", ".bun/bin/claude", ".volta/bin/claude"]
+        .map { home.appendingPathComponent($0).path } + ["/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+    if let treffer = orte.first(where: { fm.isExecutableFile(atPath: $0) }) { return treffer }
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+    p.arguments = ["-ilc", "command -v claude"]
+    let out = Pipe()
+    p.standardOutput = out
+    p.standardError = FileHandle.nullDevice
+    p.standardInput = FileHandle.nullDevice
+    if (try? p.run()) != nil {
+        p.waitUntilExit()
+        let pfad = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .split(separator: "\n").last.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
+        if pfad.hasPrefix("/"), fm.isExecutableFile(atPath: pfad) { return pfad }
+    }
+    return "claude"
+}
 /// Was Claude ohne Rückfrage tun darf. Standard: nur lesen. Mehr Freiheit: POINTY_PERMISSION_MODE=acceptEdits oder auto
 let rechteModus = umgebung["POINTY_PERMISSION_MODE"] ?? "default"
 
@@ -383,6 +405,7 @@ final class ClaudeLauf {
                 self.fertigGemeldet = true
                 let t = String(data: fehlerText, encoding: .utf8)?.getrimmt ?? ""
                 let grund = pr.terminationReason == .uncaughtSignal ? "abgebrochen" : (t.isEmpty ? "Claude hat sich ohne Antwort beendet (Code \(pr.terminationStatus))" : String(t.suffix(300)))
+                    + (t.contains("command not found") ? "\nClaude Code nicht gefunden. Im Terminal `which claude` eingeben und den Pfad als POINTY_CLAUDE setzen (siehe Anleitung)." : "")
                 melde(.fertig(antwort: "", fehler: grund))
             }
         }
