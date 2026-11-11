@@ -28,7 +28,7 @@ Beispiele: Auf eine Nachricht zeigen und sagen „Antworte freundlich, dass ich 
 ## Installieren, Schritt für Schritt
 
 1. Diesen Ordner herunterladen (grüner Knopf „Code“ > „Download ZIP“) und entpacken, oder `git clone`.
-2. Terminal öffnen und in den Ordner wechseln: `cd ~/Downloads/pointy` (Pfad anpassen).
+2. Terminal öffnen und in den Ordner wechseln: `cd ~/Downloads/pointy-main` (nach „Download ZIP“ heißt der Ordner `pointy-main`, nach `git clone` nur `pointy`).
 3. Bauen und starten: `./build.sh --start`
 4. Oben in der Menüleiste erscheint ein Mauszeiger-Symbol. Das ist Pointy.
 5. macOS fragt nach Rechten. Alle in **Systemeinstellungen > Datenschutz & Sicherheit**:
