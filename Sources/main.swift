@@ -847,6 +847,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dz.addObserver(forName: .init("\(kennung).oeffnen"), object: nil, queue: .main) { [weak self] _ in self?.kuerzel() }
         dz.addObserver(forName: .init("\(kennung).still"), object: nil, queue: .main) { [weak self] _ in self?.oeffnen(zuhoeren: false) }
         dz.addObserver(forName: .init("\(kennung).ausschnitt"), object: nil, queue: .main) { [weak self] _ in self?.ausschnitt() }
+        dz.addObserver(forName: .init("\(kennung).schliessen"), object: nil, queue: .main) { [weak self] _ in self?.schliessen() }
         dz.addObserver(forName: .init("\(kennung).einsetzen"), object: nil, queue: .main) { [weak self] _ in
             guard let self, let t = self.m.zeilen.last(where: { !$0.vonMir && !$0.fehler && !$0.einsetzen.isEmpty })?.einsetzen else { return }
             self.einsetzen(t)
@@ -1144,6 +1145,10 @@ if argumente.contains("--ausschnitt") {
 }
 if argumente.contains("--einsetzen") {
     DistributedNotificationCenter.default().postNotificationName(.init("\(kennung).einsetzen"), object: nil, userInfo: nil, deliverImmediately: true)
+    exit(0)
+}
+if argumente.contains("--schliessen") {
+    DistributedNotificationCenter.default().postNotificationName(.init("\(kennung).schliessen"), object: nil, userInfo: nil, deliverImmediately: true)
     exit(0)
 }
 if argumente.contains("--still") {   // Blase öffnen, ohne zuzuhören (zum Tippen)

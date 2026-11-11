@@ -68,6 +68,7 @@ Was Claude an Kontext bekommt, bleibt auf deinem Mac und geht nur an Claude Code
 ~/Applications/Pointy.app/Contents/MacOS/Pointy --test "Was steht hier?"
 ~/Applications/Pointy.app/Contents/MacOS/Pointy --ausschnitt     # Ausschnitt aufziehen
 ~/Applications/Pointy.app/Contents/MacOS/Pointy --einsetzen      # letzte Antwort einsetzen
+~/Applications/Pointy.app/Contents/MacOS/Pointy --schliessen     # Blase schließen
 ```
 
 ## Aufbau
