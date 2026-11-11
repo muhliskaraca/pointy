@@ -312,6 +312,7 @@ final class Hoeren {
     private var anfrage: SFSpeechAudioBufferRecognitionRequest?
     private var aufgabe: SFSpeechRecognitionTask?
     private(set) var aktiv = false
+    private var ersterTeil = false
 
     func start(teil: @escaping (String) -> Void, fehler: @escaping (String) -> Void, bereit: @escaping () -> Void) {
         SFSpeechRecognizer.requestAuthorization { st in
@@ -339,7 +340,12 @@ final class Hoeren {
         anfrage = a
         let node = engine.inputNode
         node.removeTap(onBus: 0)
-        node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { buf, _ in a.append(buf) }
+        let fmt = node.outputFormat(forBus: 0)
+        var stuecke = 0
+        node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { buf, _ in
+            a.append(buf); stuecke += 1
+            if stuecke == 1 || stuecke == 50 { log("Hören: Tonstück \(stuecke) (\(Int(fmt.sampleRate)) Hz, \(fmt.channelCount) Kanal)") }
+        }
         engine.prepare()
         do { try engine.start() } catch {
             node.removeTap(onBus: 0)
@@ -347,16 +353,56 @@ final class Hoeren {
             return
         }
         aktiv = true
+        ersterTeil = false
+        fest = ""; abschnitt = ""; zuletztFest = ""
         bereit()
+        log("Hören: gestartet, Sprache \(erkenner.locale.identifier), auf dem Gerät \(a.requiresOnDeviceRecognition)")
         aufgabe = erkenner.recognitionTask(with: a) { [weak self] res, err in
-            if let res { DispatchQueue.main.async { teil(res.bestTranscription.formattedString) } }
+            if let err { log("Hören: Erkennung meldet \((err as NSError).domain) \((err as NSError).code): \(err.localizedDescription)") }
+            if let res {
+                let t = res.bestTranscription.formattedString
+                let pause = res.speechRecognitionMetadata != nil
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if res.isFinal || !self.ersterTeil { self.ersterTeil = true; log("Hören: Text \(res.isFinal ? "fertig" : "erster Teil"), \(t.count) Zeichen") }
+                    teil(self.zusammen(t, pause: pause))
+                }
+            }
             if err != nil || (res?.isFinal ?? false) { DispatchQueue.main.async { self?.stop() } }
         }
+    }
+
+    // Apple beginnt nach jeder Sprechpause einen neuen Abschnitt und meldet dann nur diesen.
+    // Darum Abschnitte sammeln, statt den Text zu ersetzen (Muhlis 11.11.: „wenn man Pause macht, geht das davor gesprochen weg“).
+    private var fest = ""          // abgeschlossene Abschnitte
+    private var abschnitt = ""     // laufender Abschnitt
+    private var zuletztFest = ""   // zuletzt abgeschlossener Abschnitt
+
+    private func verbinde(_ a: String, _ b: String) -> String { a.isEmpty ? b : b.isEmpty ? a : a + " " + b }
+    private func woerter(_ s: String) -> [String] { s.lowercased().split(separator: " ").map(String.init) }
+
+    private func zusammen(_ roh: String, pause: Bool) -> String {
+        var t = roh
+        // Hängt der neue Abschnitt den alten doch noch vorne dran: nicht doppelt nehmen
+        if !zuletztFest.isEmpty, t.hasPrefix(zuletztFest) { t = String(t.dropFirst(zuletztFest.count)).getrimmt }
+        // Neuer Abschnitt ohne Pausen-Meldung: anderes erstes Wort und deutlich kürzer als der alte
+        let alt = woerter(abschnitt), neu = woerter(t)
+        if alt.count >= 3, let a0 = alt.first, let n0 = neu.first, a0 != n0, neu.count * 2 < alt.count {
+            fest = verbinde(fest, abschnitt); zuletztFest = abschnitt
+            log("Hören: neuer Abschnitt erkannt, Text davor behalten")
+        }
+        abschnitt = t
+        if pause && !abschnitt.isEmpty {
+            fest = verbinde(fest, abschnitt); zuletztFest = abschnitt; abschnitt = ""
+            log("Hören: Pause, Abschnitt behalten (\(fest.count) Zeichen gesamt)")
+        }
+        return verbinde(fest, abschnitt)
     }
 
     func stop() {
         guard aktiv else { return }
         aktiv = false
+        log("Hören: gestoppt, Text erkannt \(ersterTeil)")
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
         anfrage?.endAudio()
