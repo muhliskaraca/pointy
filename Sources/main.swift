@@ -49,6 +49,18 @@ func eigeneDatei(_ name: String) -> String? {
 }
 /// Was Claude ohne Rückfrage tun darf. Standard: nur lesen. Mehr Freiheit: POINTY_PERMISSION_MODE=acceptEdits oder auto
 let rechteModus = umgebung["POINTY_PERMISSION_MODE"] ?? eigeneDatei("rechte") ?? "default"
+/// Sprache der Oberfläche: folgt der Mac-Sprache (Deutsch, sonst Englisch).
+/// Erzwingen: POINTY_LANG=de oder en, oder ein Wort in der Datei „sprache“ im eigenen Ordner.
+let englisch: Bool = {
+    let wahl = (umgebung["POINTY_LANG"] ?? eigeneDatei("sprache") ?? "").lowercased()
+    if wahl.hasPrefix("en") { return true }
+    if wahl.hasPrefix("de") { return false }
+    return !(Locale.preferredLanguages.first ?? "en").lowercased().hasPrefix("de")
+}()
+/// Text in der Sprache der Oberfläche.
+func L(_ de: String, _ en: String) -> String { englisch ? en : de }
+/// Die Taste links neben der 1, wie sie auf der Tastatur heißt: deutsch ^, englisch ISO §, US `
+let taste: String = englisch ? (KBGetLayoutType(Int16(LMGetKbdType())) == kKeyboardISO ? "§" : "`") : "^"
 
 func log(_ s: String) {
     let z = "\(ISO8601DateFormatter().string(from: Date())) \(s)\n"
@@ -130,14 +142,14 @@ struct Kontext {
     var alsText: String {
         var z: [String] = []
         if !app.isEmpty { z.append("- App: \(app)") }
-        if !fenster.isEmpty { z.append("- Fenster: \(fenster)") }
-        if !adresse.isEmpty { z.append("- Adresse: \(adresse)") }
-        if !ausschnitt.isEmpty { z.append("- Aufgezogener Bildausschnitt, darum geht es: \(ausschnitt) (unbedingt zuerst mit Read ansehen)") }
-        if !markiert.isEmpty { z.append("- Markierter Text, darum geht es:\n\(markiert)") }
-        if !direkt.isEmpty { z.append("- Direkt unter dem Mauszeiger: \(direkt)") }
-        if !umgebung.isEmpty { z.append("- Text um den Mauszeiger herum:\n\(umgebung)") }
-        if !bild.isEmpty { z.append("- Bildausschnitt um den Mauszeiger: \(bild) (nur mit Read ansehen, wenn der Text nicht reicht)") }
-        return z.isEmpty ? "- (nichts erfasst, Bedienungshilfen evtl. nicht erlaubt)" : z.joined(separator: "\n")
+        if !fenster.isEmpty { z.append(L("- Fenster: ", "- Window: ") + fenster) }
+        if !adresse.isEmpty { z.append(L("- Adresse: ", "- Address: ") + adresse) }
+        if !ausschnitt.isEmpty { z.append(L("- Aufgezogener Bildausschnitt, darum geht es: \(ausschnitt) (unbedingt zuerst mit Read ansehen)", "- Screen region the user dragged, this is what it is about: \(ausschnitt) (look at it with Read first)")) }
+        if !markiert.isEmpty { z.append(L("- Markierter Text, darum geht es:\n", "- Selected text, this is what it is about:\n") + markiert) }
+        if !direkt.isEmpty { z.append(L("- Direkt unter dem Mauszeiger: ", "- Directly under the cursor: ") + direkt) }
+        if !umgebung.isEmpty { z.append(L("- Text um den Mauszeiger herum:\n", "- Text around the cursor:\n") + umgebung) }
+        if !bild.isEmpty { z.append(L("- Bildausschnitt um den Mauszeiger: \(bild) (nur mit Read ansehen, wenn der Text nicht reicht)", "- Screenshot around the cursor: \(bild) (look at it with Read only if the text is not enough)")) }
+        return z.isEmpty ? L("- (nichts erfasst, Bedienungshilfen evtl. nicht erlaubt)", "- (nothing captured, Accessibility may not be allowed)") : z.joined(separator: "\n")
     }
 }
 
@@ -305,12 +317,12 @@ final class Hoeren {
         SFSpeechRecognizer.requestAuthorization { st in
             DispatchQueue.main.async {
                 guard st == .authorized else {
-                    fehler("Spracherkennung nicht erlaubt: Systemeinstellungen › Datenschutz › Spracherkennung")
+                    fehler(L("Spracherkennung nicht erlaubt: Systemeinstellungen › Datenschutz › Spracherkennung", "Speech recognition not allowed: System Settings › Privacy › Speech Recognition"))
                     return
                 }
                 AVCaptureDevice.requestAccess(for: .audio) { ok in
                     DispatchQueue.main.async {
-                        guard ok else { fehler("Mikrofon nicht erlaubt: Systemeinstellungen › Datenschutz › Mikrofon"); return }
+                        guard ok else { fehler(L("Mikrofon nicht erlaubt: Systemeinstellungen › Datenschutz › Mikrofon", "Microphone not allowed: System Settings › Privacy › Microphone")); return }
                         self.los(teil: teil, fehler: fehler, bereit: bereit)
                     }
                 }
@@ -320,7 +332,7 @@ final class Hoeren {
 
     private func los(teil: @escaping (String) -> Void, fehler: @escaping (String) -> Void, bereit: @escaping () -> Void) {
         guard !aktiv else { return }
-        guard let erkenner, erkenner.isAvailable else { fehler("Spracherkennung gerade nicht verfügbar, bitte tippen"); return }
+        guard let erkenner, erkenner.isAvailable else { fehler(L("Spracherkennung gerade nicht verfügbar, bitte tippen", "Speech recognition not available right now, please type")); return }
         let a = SFSpeechAudioBufferRecognitionRequest()
         a.shouldReportPartialResults = true
         if erkenner.supportsOnDeviceRecognition { a.requiresOnDeviceRecognition = true }
@@ -331,7 +343,7 @@ final class Hoeren {
         engine.prepare()
         do { try engine.start() } catch {
             node.removeTap(onBus: 0)
-            fehler("Mikrofon startet nicht, bitte tippen")
+            fehler(L("Mikrofon startet nicht, bitte tippen", "Microphone does not start, please type"))
             return
         }
         aktiv = true
@@ -413,13 +425,13 @@ final class ClaudeLauf {
                 guard let self, !self.fertigGemeldet else { return }
                 self.fertigGemeldet = true
                 let t = String(data: fehlerText, encoding: .utf8)?.getrimmt ?? ""
-                let grund = pr.terminationReason == .uncaughtSignal ? "abgebrochen" : (t.isEmpty ? "Claude hat sich ohne Antwort beendet (Code \(pr.terminationStatus))" : String(t.suffix(300)))
-                    + (t.contains("command not found") ? "\nClaude Code nicht gefunden. Im Terminal `which claude` eingeben und den Pfad als POINTY_CLAUDE setzen (siehe Anleitung)." : "")
+                let grund = pr.terminationReason == .uncaughtSignal ? "abgebrochen" : (t.isEmpty ? L("Claude hat sich ohne Antwort beendet (Code \(pr.terminationStatus))", "Claude quit without an answer (code \(pr.terminationStatus))") : String(t.suffix(300)))
+                    + (t.contains("command not found") ? L("\nClaude Code nicht gefunden. Im Terminal `which claude` eingeben und den Pfad als POINTY_CLAUDE setzen (siehe Anleitung).", "\nClaude Code not found. Type `which claude` in Terminal and set that path as POINTY_CLAUDE (see the guide).") : "")
                 melde(.fertig(antwort: "", fehler: grund))
             }
         }
         do { try p.run() } catch {
-            melde(.fertig(antwort: "", fehler: "Claude startet nicht: \(error.localizedDescription)"))
+            melde(.fertig(antwort: "", fehler: L("Claude startet nicht: ", "Claude does not start: ") + error.localizedDescription))
             return
         }
         prozess = p
@@ -442,28 +454,28 @@ final class ClaudeLauf {
             let istFehler = (o["is_error"] as? Bool) == true
             let text = (o["result"] as? String ?? "").getrimmt
             DispatchQueue.main.async { self.fertigGemeldet = true }
-            sende(.fertig(antwort: istFehler ? "" : text, fehler: istFehler ? (text.isEmpty ? "Fehler bei Claude" : text) : nil))
+            sende(.fertig(antwort: istFehler ? "" : text, fehler: istFehler ? (text.isEmpty ? L("Fehler bei Claude", "Error in Claude") : text) : nil))
         default:
             break
         }
     }
 
     static func freundlich(_ n: String) -> String {
-        if n.contains("Gmail") { return "arbeitet in Gmail" }
-        if n.contains("Google_Drive") { return "arbeitet in Google Drive" }
+        if n.contains("Gmail") { return L("arbeitet in Gmail", "is working in Gmail") }
+        if n.contains("Google_Drive") { return L("arbeitet in Google Drive", "is working in Google Drive") }
         switch n {
-        case "Read": return "liest"
-        case "Bash": return "führt einen Befehl aus"
-        case "ToolSearch": return "lädt ein Werkzeug"
-        case "WebSearch", "WebFetch": return "sucht im Netz"
-        case "Edit", "Write": return "schreibt eine Datei"
-        case "Grep", "Glob": return "sucht in Dateien"
-        default: return "arbeitet"
+        case "Read": return L("liest", "is reading")
+        case "Bash": return L("führt einen Befehl aus", "is running a command")
+        case "ToolSearch": return L("lädt ein Werkzeug", "is loading a tool")
+        case "WebSearch", "WebFetch": return L("sucht im Netz", "is searching the web")
+        case "Edit", "Write": return L("schreibt eine Datei", "is writing a file")
+        case "Grep", "Glob": return L("sucht in Dateien", "is searching files")
+        default: return L("arbeitet", "is working")
         }
     }
 }
 
-let blasenRegeln = """
+let blasenRegelnDE = """
 Du läufst in der Sprechblase „\(appName)“ direkt am Mauszeiger. \
 Jemand hat auf etwas auf dem Bildschirm gezeigt und dir eine Anweisung gesprochen oder getippt. \
 In der ersten Nachricht steht, worauf gezeigt wird (App, Fenster, Webadresse, Text um den Mauszeiger, Bildausschnitt).
@@ -477,6 +489,22 @@ Regeln für die Blase:
 Formulierst du einen Text zum Einfügen (Antwort, Nachricht, Umformulierung, Übersetzung), setze genau diesen Text, ohne Vorrede, \
 zwischen <einsetzen> und </einsetzen>. Kommentar gehört außerhalb der Marken. Ohne Marken setzt der Knopf deine ganze Antwort ein.
 """
+
+let blasenRegelnEN = """
+You are running in the speech bubble "\(appName)" right at the mouse cursor. \
+Someone pointed at something on the screen and spoke or typed an instruction to you. \
+The first message says what is being pointed at (app, window, web address, text around the cursor, screenshot).
+
+Rules for the bubble:
+- Answer briefly in the language of the instruction, at most 5 sentences, no tables, no headings. Spoken instructions can contain recognition errors, interpret them sensibly.
+- Never send, post, buy or delete anything. Only draft messages and emails, or save them as drafts.
+- Unclear? Ask one short question. If the task gets big, suggest pressing "Continue in Terminal" below.
+- End with one sentence saying what you did.
+- The bubble has an "Insert" button that types text where the user pointed (message field, note, form). \
+When you write a text to be inserted (reply, message, rewrite, translation), put exactly that text, without preamble, \
+between <einsetzen> and </einsetzen>. Comments go outside the tags. Without tags the button inserts your whole answer.
+"""
+let blasenRegeln = englisch ? blasenRegelnEN : blasenRegelnDE
 
 /// Teilt eine Antwort in Anzeige und einzusetzenden Text.
 func zerlege(_ antwort: String) -> (anzeige: String, einsetzen: String) {
@@ -498,13 +526,13 @@ enum Randfarbe: String, CaseIterable {
     case automatisch, neongruen, pink, cyan, orange, lila, weiss
     var name: String {
         switch self {
-        case .automatisch: return "Automatisch (nach Hintergrund)"
-        case .neongruen: return "Neon-Grün"
+        case .automatisch: return L("Automatisch (nach Hintergrund)", "Automatic (by background)")
+        case .neongruen: return L("Neon-Grün", "Neon green")
         case .pink: return "Pink"
         case .cyan: return "Cyan"
         case .orange: return "Orange"
-        case .lila: return "Lila"
-        case .weiss: return "Weiß"
+        case .lila: return L("Lila", "Purple")
+        case .weiss: return L("Weiß", "White")
         }
     }
     var farbe: Color {
@@ -614,7 +642,7 @@ struct BlasenAnsicht: View {
                 Button(action: schliessen) {
                     Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).frame(width: 18, height: 18)
                 }
-                .buttonStyle(.plain).foregroundStyle(.secondary).help("Schließen (Esc)")
+                .buttonStyle(.plain).foregroundStyle(.secondary).help(L("Schließen (Esc)", "Close (Esc)"))
             }
 
             if m.markiertZeichen > 0 || m.ausschnittBild != nil {
@@ -626,7 +654,7 @@ struct BlasenAnsicht: View {
                             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color.accentColor.opacity(0.7)))
                     }
                     if m.markiertZeichen > 0 {
-                        Label("Markierung · \(m.markiertZeichen) Zeichen", systemImage: "text.cursor")
+                        Label(L("Markierung · \(m.markiertZeichen) Zeichen", "Selection · \(m.markiertZeichen) characters"), systemImage: "text.cursor")
                             .font(.system(size: 11)).foregroundStyle(Color.accentColor)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Capsule().fill(Color.accentColor.opacity(0.18)))
@@ -649,13 +677,13 @@ struct BlasenAnsicht: View {
                                 .id(z.id)
                             if !z.vonMir && !z.fehler && !z.einsetzen.isEmpty {
                                 Button { einsetzen(z.einsetzen) } label: {
-                                    Label("Einsetzen", systemImage: "text.insert").font(.system(size: 11.5, weight: .medium))
+                                    Label(L("Einsetzen", "Insert"), systemImage: "text.insert").font(.system(size: 11.5, weight: .medium))
                                 }
                                 .buttonStyle(.plain)
                                 .padding(.horizontal, 9).padding(.vertical, 4)
                                 .background(Capsule().fill(Color.accentColor.opacity(0.22)))
                                 .foregroundStyle(Color.accentColor)
-                                .help("Text an die Stelle schreiben, auf die du gezeigt hast (⌘ Enter)")
+                                .help(L("Text an die Stelle schreiben, auf die du gezeigt hast (⌘ Enter)", "Type the text where you pointed (⌘ Return)"))
                                 .disabled(m.laeuft)
                             }
                         }
@@ -679,7 +707,7 @@ struct BlasenAnsicht: View {
             .frame(maxHeight: .infinity)
 
             HStack(alignment: .bottom, spacing: 8) {
-                TextField(m.hoert ? "Ich höre zu …" : "Anweisung sprechen oder tippen", text: $m.eingabe, axis: .vertical)
+                TextField(m.hoert ? L("Ich höre zu …", "Listening …") : L("Anweisung sprechen oder tippen", "Speak or type an instruction"), text: $m.eingabe, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 14))
                     .lineLimit(1...5)
@@ -688,33 +716,33 @@ struct BlasenAnsicht: View {
                 Button(action: ausschnitt) {
                     Image(systemName: "viewfinder").font(.system(size: 15)).foregroundStyle(Color.secondary).frame(width: 22, height: 22)
                 }
-                .buttonStyle(.plain).help("Bildausschnitt aufziehen (^ + 2)")
+                .buttonStyle(.plain).help(L("Bildausschnitt aufziehen", "Drag a screen region") + " (\(taste) + 2)")
                 Button(action: mikro) {
                     Image(systemName: m.hoert ? "mic.fill" : "mic")
                         .font(.system(size: 15))
                         .foregroundStyle(m.hoert ? Color.red : Color.secondary)
                         .frame(width: 22, height: 22)
                 }
-                .buttonStyle(.plain).help(m.hoert ? "Zuhören beenden" : "Sprechen")
+                .buttonStyle(.plain).help(m.hoert ? L("Zuhören beenden", "Stop listening") : L("Sprechen", "Speak"))
                 Button(action: senden) {
                     Image(systemName: "arrow.up.circle.fill").font(.system(size: 21))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(m.eingabe.getrimmt.isEmpty || m.laeuft ? Color.secondary.opacity(0.5) : Color.accentColor)
                 .disabled(m.eingabe.getrimmt.isEmpty || m.laeuft)
-                .help("Abschicken (Enter oder ^ + 1)")
+                .help(L("Abschicken (Enter oder \(taste) + 1)", "Send (Return or \(taste) + 1)"))
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.07)))
 
             HStack(spacing: 8) {
-                Text(m.hinweis.isEmpty ? "^ + 1 oder Enter schickt ab · Esc schließt" : m.hinweis)
+                Text(m.hinweis.isEmpty ? L("\(taste) + 1 oder Enter schickt ab · Esc schließt", "\(taste) + 1 or Return sends · Esc closes") : m.hinweis)
                     .font(.system(size: 10.5))
                     .foregroundStyle(m.hinweis.isEmpty ? Color.secondary.opacity(0.8) : Color.orange)
                     .lineLimit(2)
                 Spacer(minLength: 6)
                 if m.session != nil {
-                    Button("Im Terminal weiter", action: terminal)
+                    Button(L("Im Terminal weiter", "Continue in Terminal"), action: terminal)
                         .buttonStyle(.link)
                         .font(.system(size: 11))
                         .disabled(m.laeuft)
@@ -883,14 +911,14 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         menu.removeAllItems()
-        menu.addItem(withTitle: "Blase öffnen (^ halten + 1)", action: #selector(menuOeffnen), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L("Blase öffnen (\(taste) halten + 1)", "Open bubble (hold \(taste) + 1)"), action: #selector(menuOeffnen), keyEquivalent: "").target = self
         menu.addItem(.separator())
         let ax = AXIsProcessTrusted()
-        let i = menu.addItem(withTitle: ax ? "Bedienungshilfen: erlaubt" : "Bedienungshilfen fehlen: hier erlauben", action: ax ? nil : #selector(rechte), keyEquivalent: "")
+        let i = menu.addItem(withTitle: ax ? L("Bedienungshilfen: erlaubt", "Accessibility: allowed") : L("Bedienungshilfen fehlen: hier erlauben", "Accessibility missing: allow here"), action: ax ? nil : #selector(rechte), keyEquivalent: "")
         i.target = self
-        if Kuerzel.shared.tap == nil { menu.addItem(withTitle: "Kürzel ^ + 1 wartet auf Bedienungshilfen", action: nil, keyEquivalent: "") }
+        if Kuerzel.shared.tap == nil { menu.addItem(withTitle: L("Kürzel \(taste) + 1 wartet auf Bedienungshilfen", "Shortcut \(taste) + 1 waits for Accessibility"), action: nil, keyEquivalent: "") }
         menu.addItem(.separator())
-        let farbe = NSMenuItem(title: "Randfarbe", action: nil, keyEquivalent: "")
+        let farbe = NSMenuItem(title: L("Randfarbe", "Border color"), action: nil, keyEquivalent: "")
         let unter = NSMenu()
         for f in Randfarbe.allCases {
             let e = unter.addItem(withTitle: f.name, action: #selector(randfarbeWaehlen(_:)), keyEquivalent: "")
@@ -901,8 +929,8 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         farbe.submenu = unter
         menu.addItem(farbe)
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Autostart ausschalten", action: #selector(autostartAus), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Beenden", action: #selector(beenden), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L("Autostart ausschalten", "Turn off autostart"), action: #selector(autostartAus), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L("Beenden", "Quit"), action: #selector(beenden), keyEquivalent: "").target = self
     }
 
     @objc func menuOeffnen() { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.oeffnen(zuhoeren: true) } }
@@ -1069,13 +1097,13 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.zeilen.append(.init(vonMir: true, text: text))
         m.eingabe = ""
         let prompt = m.session == nil
-            ? "Anweisung: \(text)\n\nWorauf gezeigt wird:\n\(m.kontext.alsText)"
-            : "Anweisung: \(text)" + (m.ausschnittNeu.isEmpty ? "" : "\n\nDazu wurde jetzt dieser Bildausschnitt aufgezogen, unbedingt mit Read ansehen: \(m.ausschnittNeu)")
+            ? L("Anweisung: ", "Instruction: ") + text + L("\n\nWorauf gezeigt wird:\n", "\n\nWhat is being pointed at:\n") + m.kontext.alsText
+            : L("Anweisung: ", "Instruction: ") + text + (m.ausschnittNeu.isEmpty ? "" : L("\n\nDazu wurde jetzt dieser Bildausschnitt aufgezogen, unbedingt mit Read ansehen: ", "\n\nThe user just dragged this screen region, look at it with Read: ") + m.ausschnittNeu)
         m.ausschnittNeu = ""
         m.laeuft = true
-        m.status = "Claude denkt …"
+        m.status = L("Claude denkt …", "Claude is thinking …")
         log("Gesendet (\(m.session == nil ? "neu" : "Folge")): \(text.prefix(200))")
-        lauf.start(prompt: prompt, session: m.session, system: blasenRegeln + (eigeneDatei("regeln.md").map { "\n\nEigene Regeln dieses Nutzers:\n" + $0 } ?? "")) { [weak self] e in
+        lauf.start(prompt: prompt, session: m.session, system: blasenRegeln + (eigeneDatei("regeln.md").map { L("\n\nEigene Regeln dieses Nutzers:\n", "\n\nThis user's own rules:\n") + $0 } ?? "")) { [weak self] e in
             guard let self else { return }
             switch e {
             case .session(let s): self.m.session = s
@@ -1089,7 +1117,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     log("Fehler: \(fehler.prefix(300))")
                 } else {
                     let (anzeige, kern) = zerlege(antwort)
-                    self.m.zeilen.append(.init(vonMir: false, text: anzeige.isEmpty ? "Erledigt." : anzeige, einsetzen: kern))
+                    self.m.zeilen.append(.init(vonMir: false, text: anzeige.isEmpty ? L("Erledigt.", "Done.") : anzeige, einsetzen: kern))
                     log("Antwort: \(antwort.prefix(400).replacingOccurrences(of: "\n", with: " "))")
                 }
                 self.m.fokus += 1
@@ -1101,7 +1129,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Eingabefeld fokussieren, über die Zwischenablage einfügen, alte Zwischenablage zurück.
     func einsetzen(_ text: String) {
         guard !text.isEmpty else { return }
-        guard AXIsProcessTrusted() else { m.hinweis = "Einsetzen braucht die Bedienungshilfen"; return }
+        guard AXIsProcessTrusted() else { m.hinweis = L("Einsetzen braucht die Bedienungshilfen", "Insert needs Accessibility"); return }
         let k = m.kontext
         let pb = NSPasteboard.general
         let alt = Ablage.sichern()
@@ -1132,7 +1160,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         do {
             try inhalt.write(to: datei, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: datei.path)
-        } catch { m.hinweis = "Terminal-Datei ging nicht"; return }
+        } catch { m.hinweis = L("Terminal-Datei ging nicht", "Could not write the Terminal file"); return }
         NSWorkspace.shared.open([datei], withApplicationAt: URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"),
                                 configuration: NSWorkspace.OpenConfiguration())
         log("Im Terminal weiter: \(sid)")
