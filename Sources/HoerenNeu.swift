@@ -64,8 +64,8 @@ final class HoerenNeu {
             do {
                 for try await r in tr.results {
                     let t = String(r.text.characters)
-                    if r.isFinal { fest += t; fluechtig = "" } else { fluechtig = t }
-                    self.gesamt = (fest + fluechtig).getrimmt
+                    if r.isFinal { fest = HoerenNeu.dran(fest, t); fluechtig = "" } else { fluechtig = t }
+                    self.gesamt = HoerenNeu.dran(fest, fluechtig).getrimmt
                     teil(self.gesamt)
                 }
             } catch { log("Hören (neu): Ergebnisse brechen ab: \(error.localizedDescription)") }
@@ -111,6 +111,12 @@ final class HoerenNeu {
             melde()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { melde() }
+    }
+
+    /// Stücke verbinden: Zahlen kommen nach Pausen ohne Leerzeichen („1“, „2“ wurde „12“, Muhlis 11.11.2026).
+    static func dran(_ a: String, _ b: String) -> String {
+        guard let l = a.last, let f = b.first, !l.isWhitespace, !f.isWhitespace, !f.isPunctuation else { return a + b }
+        return a + " " + b
     }
 
     private func aufraeumen() {
