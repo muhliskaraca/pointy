@@ -60,7 +60,7 @@ Hast du Claude Code schon (im Terminal läuft `claude`), fang bei Schritt 3 an.
    Oben in der Menüleiste erscheint ein Mauszeiger-Symbol. Das ist Pointy. (Wer lieber klickt: grüner Knopf „Code“ > „Download ZIP“, dann `cd ~/Downloads/pointy-main` und `./build.sh --start`.)
 5. Rechte geben, alle unter **Apfel-Menü > Systemeinstellungen > Datenschutz & Sicherheit**:
    - **Bedienungshilfen**: Pointy einschalten. Nötig für die Tasten, den Text unter dem Mauszeiger und das Einsetzen.
-   - **Bildschirmaufnahme** (auf neueren Macs mit „Systemaudio“ im Namen): Pointy einschalten. Nötig, damit Claude die Stelle sieht.
+   - **Aufnahme von Bildschirm & Systemaudio** (auf älteren Macs: Bildschirmaufnahme): Pointy einschalten. Nötig, damit Claude die Stelle sieht.
    - **Mikrofon** und **Spracherkennung**: erst beim ersten Sprechen. Wer nur tippt, braucht sie nicht.
 6. Pointy neu starten, damit die Rechte greifen:
    ```
@@ -95,7 +95,7 @@ Was Claude an Kontext bekommt, bleibt auf deinem Mac und geht nur an Claude Code
 ## Wenn etwas nicht geht
 
 - **Blase geht nicht auf**: Bedienungshilfen für Pointy an? Danach Pointy neu starten. Im Protokoll muss „Bedienungshilfen erlaubt“ stehen.
-- **Claude sieht kein Bild**: Bildschirmaufnahme erlauben, Pointy neu starten.
+- **Claude sieht kein Bild**: Aufnahme von Bildschirm & Systemaudio erlauben, Pointy neu starten.
 - **Fehler bei Claude**: im Terminal `claude` starten und prüfen, ob du angemeldet bist.
 - **Nach jedem Neubau fragt macOS wieder nach Rechten**: das liegt an der Ad-hoc-Signatur. Mit eigener Apple-Development-Identität bleiben die Rechte: `POINTY_SIGN_ID="Apple Development: …" ./build.sh` (Liste: `security find-identity -p codesigning -v`).
 - **Einsetzen landet nicht**: manche Apps nehmen kein Einfügen von außen an. Dann den Text in der Blase kopieren.
