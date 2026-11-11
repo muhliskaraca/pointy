@@ -51,6 +51,13 @@ open ~/Applications/Pointy.app
 
 Werte wie bei Claude Code: `default` (nur lesen, Standard), `acceptEdits`, `auto`. Liegt `claude` nicht im normalen Pfad, zeigt `POINTY_CLAUDE=/pfad/zu/claude` auf den richtigen Ort.
 
+Dauerhaft und ohne Terminal geht es mit zwei kleinen Dateien im Ordner `~/Library/Application Support/Pointy/`:
+
+- `rechte`: ein Wort, `acceptEdits` oder `auto`. Gilt ab dem nächsten Start von Pointy.
+- `regeln.md`: eigene Regeln für Claude, eine pro Zeile, zum Beispiel „Mails nur als Entwurf ablegen“ oder „Antworte immer auf Englisch“. Gilt ab der nächsten Frage.
+
+Beide Dateien bleiben auf deinem Mac.
+
 Was Claude an Kontext bekommt, bleibt auf deinem Mac und geht nur an Claude Code, so wie alles, was du im Terminal mit Claude machst. Bilder landen in `~/Library/Caches/Pointy` (nur die letzten 10), das Protokoll in `~/Library/Logs/Pointy.log`.
 
 ## Wenn etwas nicht geht

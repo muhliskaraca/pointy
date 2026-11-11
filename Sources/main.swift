@@ -38,8 +38,17 @@ func findeClaude() -> String {
     }
     return "claude"
 }
+/// Eigene Einstellungen, bleiben nur auf diesem Mac: ~/Library/Application Support/Pointy/
+///   regeln.md   zusätzliche Regeln für Claude, gelten ab der nächsten Frage
+///   rechte      ein Wort: acceptEdits oder auto (wie POINTY_PERMISSION_MODE)
+let eigenerOrdner = home.appendingPathComponent("Library/Application Support/\(appName)", isDirectory: true)
+func eigeneDatei(_ name: String) -> String? {
+    guard let t = try? String(contentsOf: eigenerOrdner.appendingPathComponent(name), encoding: .utf8) else { return nil }
+    let g = t.trimmingCharacters(in: .whitespacesAndNewlines)
+    return g.isEmpty ? nil : g
+}
 /// Was Claude ohne Rückfrage tun darf. Standard: nur lesen. Mehr Freiheit: POINTY_PERMISSION_MODE=acceptEdits oder auto
-let rechteModus = umgebung["POINTY_PERMISSION_MODE"] ?? "default"
+let rechteModus = umgebung["POINTY_PERMISSION_MODE"] ?? eigeneDatei("rechte") ?? "default"
 
 func log(_ s: String) {
     let z = "\(ISO8601DateFormatter().string(from: Date())) \(s)\n"
@@ -1066,7 +1075,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.laeuft = true
         m.status = "Claude denkt …"
         log("Gesendet (\(m.session == nil ? "neu" : "Folge")): \(text.prefix(200))")
-        lauf.start(prompt: prompt, session: m.session, system: blasenRegeln) { [weak self] e in
+        lauf.start(prompt: prompt, session: m.session, system: blasenRegeln + (eigeneDatei("regeln.md").map { "\n\nEigene Regeln dieses Nutzers:\n" + $0 } ?? "")) { [weak self] e in
             guard let self else { return }
             switch e {
             case .session(let s): self.m.session = s
