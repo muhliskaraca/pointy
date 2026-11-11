@@ -113,7 +113,13 @@ Examples: point at a message and say "Reply kindly that tomorrow works for me", 
 
 ### Language
 
-Pointy follows your Mac's language: German if German comes first, English otherwise. To choose yourself, put one word, `en` or `de`, into the file `~/Library/Application Support/Pointy/sprache`, or start Pointy with `launchctl setenv POINTY_LANG en`, then restart Pointy.
+Pointy follows your Mac's language: German if German comes first, English otherwise. To choose yourself, put one word, `en` or `de`, into the file `~/Library/Application Support/Pointy/sprache`, then restart Pointy:
+
+```
+mkdir -p ~/Library/Application\ Support/Pointy && echo en > ~/Library/Application\ Support/Pointy/sprache
+```
+
+For one session only: `launchctl setenv POINTY_LANG en`.
 
 ### What you need
 
