@@ -130,7 +130,7 @@ For one session only: `launchctl setenv POINTY_LANG en`.
 ### Install, step by step
 
 1. Download this folder (green "Code" button > "Download ZIP") and unzip it, or `git clone`.
-2. Open the Terminal and go into the folder: `cd ~/Downloads/pointy-main` (adjust the path).
+2. Open the Terminal and go into the folder: `cd ~/Downloads/pointy-main` (after "Download ZIP" the folder is called `pointy-main`, after `git clone` just `pointy`).
 3. Build and start: `./build.sh --start`
 4. A mouse pointer icon appears in the menu bar. That's Pointy.
 5. macOS asks for permissions. All of them are in **System Settings > Privacy & Security**:
