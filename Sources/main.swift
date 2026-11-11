@@ -324,11 +324,32 @@ final class Hoeren {
                 AVCaptureDevice.requestAccess(for: .audio) { ok in
                     DispatchQueue.main.async {
                         guard ok else { fehler(L("Mikrofon nicht erlaubt: Systemeinstellungen › Datenschutz › Mikrofon", "Microphone not allowed: System Settings › Privacy › Microphone")); return }
-                        self.los(teil: teil, fehler: fehler, bereit: bereit)
+                        if #available(macOS 26.0, *) { self.losNeu(teil: teil, fehler: fehler, bereit: bereit) } else { self.los(teil: teil, fehler: fehler, bereit: bereit) }
                     }
                 }
             }
         }
+    }
+
+    private var neu: AnyObject?
+
+    @available(macOS 26.0, *)
+    private func losNeu(teil: @escaping (String) -> Void, fehler: @escaping (String) -> Void, bereit: @escaping () -> Void) {
+        guard !aktiv else { return }
+        aktiv = true
+        ersterTeil = false
+        let n = HoerenNeu()
+        neu = n
+        n.start(teil: { [weak self] t in
+            guard let self, self.aktiv else { return }
+            if !self.ersterTeil { self.ersterTeil = true; log("Hören: erster Text") }
+            teil(t)
+        }, fehler: { [weak self] f in
+            guard let self else { return }
+            log("Hören: neue Erkennung geht nicht (\(f)), nehme die alte")
+            self.aktiv = false; self.neu = nil
+            self.los(teil: teil, fehler: fehler, bereit: bereit)
+        }, bereit: bereit)
     }
 
     private func los(teil: @escaping (String) -> Void, fehler: @escaping (String) -> Void, bereit: @escaping () -> Void) {
@@ -399,10 +420,13 @@ final class Hoeren {
         return verbinde(fest, abschnitt)
     }
 
-    func stop() {
-        guard aktiv else { return }
+    /// `fertig` bekommt bei der neuen Erkennung den endgültigen Text, bei der alten nil.
+    func stop(fertig: ((String?) -> Void)? = nil) {
+        guard aktiv else { fertig?(nil); return }
         aktiv = false
         log("Hören: gestoppt, Text erkannt \(ersterTeil)")
+        if #available(macOS 26.0, *), let n = neu as? HoerenNeu { n.stop(fertig: fertig); neu = nil; return }
+        defer { fertig?(nil) }
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
         anfrage?.endAudio()
@@ -1024,7 +1048,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // ^ + 1: öffnen, sonst abschicken oder zuhören
     func kuerzel() {
         if !panel.isVisible { oeffnen(zuhoeren: true); return }
-        if !m.eingabe.getrimmt.isEmpty { senden(); return }
+        if !m.eingabe.getrimmt.isEmpty || hoeren.aktiv { senden(); return }
         if !hoeren.aktiv && !m.laeuft { mikro() }
     }
 
@@ -1116,7 +1140,7 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func mikro() {
         if hoeren.aktiv {
-            hoeren.stop()
+            hoeren.stop { [weak self] t in self?.endText(t) }
             m.hoert = false
             return
         }
@@ -1134,7 +1158,27 @@ final class Steuerung: NSObject, NSApplicationDelegate, NSMenuDelegate {
         })
     }
 
+    /// Endgültiger Text der Spracherkennung ins Feld (Apple schreibt die letzten Wörter erst nach dem Stopp fertig).
+    private func endText(_ t: String?) {
+        guard let t, !t.isEmpty else { return }
+        m.eingabe = m.vorText.isEmpty ? t : m.vorText + " " + t
+    }
+
+    private var schliesstAb = false
     func senden() {
+        if hoeren.aktiv {                       // erst zu Ende hören, dann schicken
+            guard !schliesstAb else { return }
+            schliesstAb = true
+            m.hoert = false
+            hoeren.stop { [weak self] t in
+                guard let self else { return }
+                self.schliesstAb = false
+                self.endText(t)
+                self.senden()
+            }
+            return
+        }
+        guard !schliesstAb else { return }
         let text = m.eingabe.getrimmt
         guard !text.isEmpty, !m.laeuft else { return }
         hoeren.stop()
