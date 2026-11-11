@@ -84,7 +84,7 @@ Was Claude an Kontext bekommt, bleibt auf deinem Mac und geht nur an Claude Code
 
 ## Aufbau
 
-Eine einzige Datei: `Sources/main.swift` (AppKit + SwiftUI, etwa 1200 Zeilen). Bedienungshilfen-Schnittstelle für Text und Markierung, `screencapture` für Bilder, Apples Spracherkennung, Claude Code per `claude -p --output-format stream-json`. Bauen ohne Xcode-Projekt, nur `swiftc` in `build.sh`.
+Zwei Dateien: `Sources/main.swift` (AppKit + SwiftUI, etwa 1300 Zeilen) und `Sources/HoerenNeu.swift` (Apples neue Spracherkennung ab macOS 26, ältere Macs nehmen die bisherige). Bedienungshilfen-Schnittstelle für Text und Markierung, `screencapture` für Bilder, Apples Spracherkennung, Claude Code per `claude -p --output-format stream-json`. Bauen ohne Xcode-Projekt, nur `swiftc` in `build.sh`.
 
 ## Lizenz
 
@@ -172,6 +172,6 @@ The context Claude gets stays on your Mac and only goes to Claude Code, just lik
 
 ### Under the hood
 
-One single file: `Sources/main.swift` (AppKit + SwiftUI, about 1,200 lines). Accessibility API for text and selection, `screencapture` for pictures, Apple's speech recognition, Claude Code via `claude -p --output-format stream-json`. Built without an Xcode project, just `swiftc` in `build.sh`.
+Two files: `Sources/main.swift` (AppKit + SwiftUI, about 1,300 lines) and `Sources/HoerenNeu.swift` (Apple's new speech recognition from macOS 26 on, older Macs use the previous one). Accessibility API for text and selection, `screencapture` for pictures, Apple's speech recognition, Claude Code via `claude -p --output-format stream-json`. Built without an Xcode project, just `swiftc` in `build.sh`.
 
 MIT license, see `LICENSE`. Unofficial. Not made by Anthropic. "Claude" is a trademark of Anthropic.
