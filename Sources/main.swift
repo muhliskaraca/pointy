@@ -846,6 +846,13 @@ final class Kuerzel {
     var ausgeloest: (Int) -> Void = { _ in }  // 1 = Blase, 2 = Ausschnitt
     private(set) var tap: CFMachPort?
     private let marke: Int64 = 0x5A53_5052
+    /// Klyvo (`~/atelier-buddy`, Nebenbei.swift) reicht mit dieser Marke nach: nie anfassen, sonst endloses Hin und Her.
+    private let klyvoMarke: Int64 = 0x4B4C_5956
+    /// ^ + F-Taste gehört Klyvo (^ + F13 zeigen, ^ + F14 Ausschnitt): ^ still verbrauchen, F-Taste mit dieser Marke weiter.
+    private let uebergabe: Int64 = 0x5A53_5055
+    private let fTasten: Set<Int64> = Set([kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
+                                           kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18,
+                                           kVK_F19, kVK_F20].map { Int64($0) })
     private var zirkumflex: Int64 = Int64(kVK_ISO_Section)  // Code der zuletzt gedrückten ^-Taste, fürs Nachreichen
     private let eins: Int64 = Int64(kVK_ANSI_1)
     private let zwei: Int64 = Int64(kVK_ANSI_2)
@@ -890,7 +897,8 @@ final class Kuerzel {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return Unmanaged.passUnretained(ev)
         }
-        if ev.getIntegerValueField(.eventSourceUserData) == marke { return Unmanaged.passUnretained(ev) }
+        let herkunft = ev.getIntegerValueField(.eventSourceUserData)
+        if herkunft == marke || herkunft == klyvoMarke { return Unmanaged.passUnretained(ev) }
         let code = ev.getIntegerValueField(.keyboardEventKeycode)
         let wiederholt = ev.getIntegerValueField(.keyboardEventAutorepeat) != 0
         let modifikatoren = ev.flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift])
@@ -915,6 +923,12 @@ final class Kuerzel {
             return Unmanaged.passUnretained(ev)
         }
 
+        if (wartet || verbraucht) && typ == .keyDown && fTasten.contains(code) {
+            wartet = false
+            verbraucht = true
+            ev.setIntegerValueField(.eventSourceUserData, value: uebergabe)
+            return Unmanaged.passUnretained(ev)
+        }
         if (wartet || verbraucht) && typ == .keyDown && (code == eins || code == zwei) {
             wartet = false
             verbraucht = true
