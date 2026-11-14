@@ -846,7 +846,7 @@ final class Kuerzel {
     var ausgeloest: (Int) -> Void = { _ in }  // 1 = Blase, 2 = Ausschnitt
     private(set) var tap: CFMachPort?
     private let marke: Int64 = 0x5A53_5052
-    private var zirkumflex: Int64 = Int64(kVK_ISO_Section)
+    private var zirkumflex: Int64 = Int64(kVK_ISO_Section)  // Code der zuletzt gedrückten ^-Taste, fürs Nachreichen
     private let eins: Int64 = Int64(kVK_ANSI_1)
     private let zwei: Int64 = Int64(kVK_ANSI_2)
     private var wartet = false      // ^ gedrückt, noch zurückgehalten
@@ -854,8 +854,6 @@ final class Kuerzel {
 
     func starten() -> Bool {
         if tap != nil { return true }
-        // ISO-Tastatur (deutsch): Taste links neben der 1 ist kVK_ISO_Section, sonst kVK_ANSI_Grave
-        zirkumflex = KBGetLayoutType(Int16(LMGetKbdType())) == kKeyboardISO ? Int64(kVK_ISO_Section) : Int64(kVK_ANSI_Grave)
         let maske = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
         guard let t = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
                                         eventsOfInterest: CGEventMask(maske),
@@ -865,8 +863,20 @@ final class Kuerzel {
         CFRunLoopAddSource(CFRunLoopGetMain(), quelle, .commonModes)
         CGEvent.tapEnable(tap: t, enable: true)
         tap = t
-        log("Kürzel aktiv, Taste \(zirkumflex)")
+        log("Kürzel aktiv, Taste je Tastendruck (ISO 10, sonst 50), Systemtyp \(LMGetKbdType())")
         return true
+    }
+
+    // Taste links neben der 1: auf ISO-Tastaturen (deutsch) kVK_ISO_Section, sonst kVK_ANSI_Grave.
+    // Je Tastendruck aus dem Tastaturtyp des Ereignisses, nicht einmal beim Start: beim Autostart
+    // nach dem Anmelden meldete LMGetKbdType() noch keine ISO-Tastatur, Pointy lauschte auf 50,
+    // die ^-Taste schickt aber 10, ^ + 1 tat nichts (12. bis 14.11.2026).
+    private func istZirkumflex(_ code: Int64, _ ev: CGEvent) -> Bool {
+        guard code == Int64(kVK_ISO_Section) || code == Int64(kVK_ANSI_Grave) else { return false }
+        var typ = UInt32(truncatingIfNeeded: ev.getIntegerValueField(.keyboardEventKeyboardType))
+        if typ == 0 { typ = UInt32(LMGetKbdType()) }
+        let iso = KBGetLayoutType(Int16(truncatingIfNeeded: typ)) == kKeyboardISO
+        return code == (iso ? Int64(kVK_ISO_Section) : Int64(kVK_ANSI_Grave))
     }
 
     private func poste(_ code: Int64, runter: Bool, wie vorlage: CGEvent? = nil) {
@@ -885,10 +895,11 @@ final class Kuerzel {
         let wiederholt = ev.getIntegerValueField(.keyboardEventAutorepeat) != 0
         let modifikatoren = ev.flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift])
 
-        if code == zirkumflex {
+        if istZirkumflex(code, ev) {
             if typ == .keyDown {
                 if verbraucht || wartet { return nil }               // Wiederholung beim Halten
                 if !modifikatoren.isEmpty || wiederholt { return Unmanaged.passUnretained(ev) } // ° und Co. normal
+                zirkumflex = code
                 wartet = true
                 return nil
             }
